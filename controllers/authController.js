@@ -3,6 +3,10 @@ import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
 import { validationResult } from "express-validator";
 import transporter from "../config/nodemailer.js";
+import {
+    EMAIL_VERIFY_TEMPLATES,
+    PASSWORD_RESET_TEMPLATE,
+} from "../config/emailTemplates.js";
 
 export const register = async (req, res, next) => {
     const errors = validationResult(req);
@@ -53,7 +57,8 @@ export const register = async (req, res, next) => {
 
         await transporter.sendMail(mailOptions);
 
-        return res.json({
+        return res.status(201).json({
+            success: true,
             message: "User registered successfully!",
             userId: user._id,
         });
@@ -102,7 +107,14 @@ export const login = async (req, res, next) => {
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
-        return res.json({ message: "Login Successfully!", userId: user._id });
+        return res.status(200).json({
+            success: true,
+            message: "Login Successfully!",
+            userData: {
+                id: user._id,
+                name: user.name,
+            },
+        });
     } catch (error) {
         if (!error.statusCode) {
             error.statusCode = 500;
@@ -120,7 +132,7 @@ export const logout = async (req, res, next) => {
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
-        return res.json({ message: "logged out" });
+        return res.status(200).json({ success: true, message: "logged out" });
     } catch (error) {
         if (!error.statusCode) {
             error.statusCode = 500;
@@ -140,7 +152,7 @@ export const sendVerifyOtp = async (req, res, next) => {
             throw error;
         }
 
-        const otp = String(Math.floor(10000 + Math.random() * 900000));
+        const otp = String(Math.floor(100000 + Math.random() * 900000));
         user.verifyOtp = otp;
         user.verifyOtpExpireAt = Date.now() + 24 * 60 * 60 * 1000;
         await user.save();
@@ -150,12 +162,18 @@ export const sendVerifyOtp = async (req, res, next) => {
             from: process.env.SENDER_EMAIL,
             to: user.email,
             subject: "Account Verification OTP",
-            text: `Your OTP is ${otp}. verify your account using this OTP`,
+            // text: `Your OTP is ${otp}. verify your account using this OTP`,
+            html: EMAIL_VERIFY_TEMPLATES.replace("{{otp}}", otp).replace(
+                "{{email}}",
+                user.email
+            ),
         };
 
         await transporter.sendMail(mailOptions);
 
-        return res.json({ message: "Verification OTP sent on email" });
+        return res
+            .status(200)
+            .json({ success: true, message: "Verification OTP sent on email" });
     } catch (error) {
         if (!error.statusCode) {
             error.statusCode = 500;
@@ -194,7 +212,9 @@ export const verifyEmail = async (req, res, next) => {
 
         await user.save();
 
-        return res.json({ message: "Email verified successfully" });
+        return res
+            .status(200)
+            .json({ success: true, message: "Email verified successfully" });
     } catch (error) {
         if (!error.statusCode) {
             error.statusCode = 500;
@@ -206,7 +226,9 @@ export const verifyEmail = async (req, res, next) => {
 // check if user is authenticated
 export const isAuthenticated = async (req, res, next) => {
     try {
-        return res.json({ message: "user is authenticated" });
+        return res
+            .status(200)
+            .json({ success: true, message: "user is authenticated" });
     } catch (error) {
         if (!error.statusCode) {
             error.statusCode = 500;
@@ -217,9 +239,17 @@ export const isAuthenticated = async (req, res, next) => {
 
 // send password reset OTP
 export const sendResetOtp = async (req, res, next) => {
+    const errors = validationResult(req);
     const { email } = req.body;
 
     try {
+        if (!errors.isEmpty()) {
+            const error = new Error("validation failed");
+            error.statusCode = 422;
+            error.data = errors.array();
+            throw error;
+        }
+
         const user = await userModel.findOne({ email: email });
         if (!user) {
             const error = new Error("user not found");
@@ -236,12 +266,16 @@ export const sendResetOtp = async (req, res, next) => {
             from: process.env.SENDER_EMAIL,
             to: user.email,
             subject: "Password reset OTP",
-            text: `Your OTP for resetting your password is ${otp}. use this to proceed with resetting your password`,
+            // text: `Your OTP for resetting your password is ${otp}. use this to proceed with resetting your password`,
+            html: PASSWORD_RESET_TEMPLATE.replace("{{otp}}", otp).replace(
+                "{{email}}",
+                user.email
+            ),
         };
 
         await transporter.sendMail(mailOptions);
 
-        return res.json({ mesage: "OTP sent tou your email" });
+        return res.status(200).json({ message: "OTP sent tou your email" });
     } catch (error) {
         if (!error.statusCode) {
             error.statusCode = 500;
@@ -279,7 +313,9 @@ export const resetPassword = async (req, res, next) => {
 
         await user.save();
 
-        return res.json({ message: "Password has been reset successfully" });
+        return res
+            .status(200)
+            .json({ message: "Password has been reset successfully" });
     } catch (error) {
         if (!error.statusCode) {
             error.statusCode = 500;
