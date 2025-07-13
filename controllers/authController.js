@@ -286,7 +286,14 @@ export const sendResetOtp = async (req, res, next) => {
 
 // reset user password
 export const resetPassword = async (req, res, next) => {
+    const errors = validationResult(req);
     const { email, otp, newPassword } = req.body;
+    if (!errors.isEmpty()) {
+        const error = new Error("Validation failed");
+        error.data = errors.array();
+        error.statusCode = 409;
+        next(error);
+    }
     try {
         const user = await userModel.findOne({ email: email });
         if (!user) {
@@ -306,7 +313,16 @@ export const resetPassword = async (req, res, next) => {
             throw error;
         }
 
+        const isMatch = await bcrypt.compare(newPassword, user.password);
+
+        if (isMatch) {
+            const error = new Error("Use new password");
+            error.statusCode = 409;
+            throw error;
+        }
+
         const hashedPassword = await bcrypt.hash(newPassword, 12);
+
         user.password = hashedPassword;
         user.resetOtp = "";
         user.resetOtpExpireAt = 0;

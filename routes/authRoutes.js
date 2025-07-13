@@ -40,9 +40,13 @@ router.post("/verify-account", userAuth, verifyEmail);
 router.get("/is-auth", userAuth, isAuthenticated);
 router.post(
     "/send-reset-otp",
-    [body("email").isEmail().withMessage("Enter a valid email")],
+    [body("email").notEmpty().withMessage("field cannot be empty")],
     sendResetOtp
 );
-router.post("/reset-password", resetPassword);
+router.post(
+    "/reset-password",
+
+    resetPassword
+);
 
 export default router;
